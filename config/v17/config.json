@@ -1,0 +1,22 @@
+{
+    "hooks": [
+        "actionObjectProductAddAfter",
+        "actionObjectProductUpdateAfter",
+        "actionObjectProductDeleteAfter",
+        "displayAdminProductsOptionsStepBottom",
+
+        "actionGetProductPropertiesAfter",
+        "actionFrontControllerSetMedia",
+        "displayProductActions"
+    ],
+
+    "tabs": [
+    ],
+
+    "models": [
+        {"className": "mdg\\salerestriction\\Models\\ProductModel", "removeOnUninstall": true}
+    ],
+
+    "fields": [
+    ]
+}
