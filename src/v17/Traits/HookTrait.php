@@ -25,22 +25,44 @@ trait HookTrait
      */
     public function hookActionGetProductPropertiesAfter(array &$params)
     {
-        $productModel = ProductModel::getInstanceByIdObject($params['product']['id_product'], false);
-        if ($productModel->active) {
-            $available_for_order = $productModel->getIsAvailableForOrder((int) $this->context->customer->id, (int) $this->context->cart->id);
-            $params['product']['available_for_order'] &= $available_for_order;
-            $params['product'][$this->name] = [
-                'soldQuantity' => $productModel->soldQuantity,
-                'wantedQuantity' => $productModel->wantedQuantity,
-                'limitQuantity' => $productModel->limit,
-                'date_from' => $productModel->date_from,
-                'date_to' => $productModel->date_to,
-                'text_available' => $productModel->text_available[$this->context->language->id],
-                'text_notavailable' => $productModel->text_notavailable[$this->context->language->id],
-                'available_for_order' => $available_for_order,
-            ];
+        $productModelDatas = $this->_getCurrentProductModel($params['product']['id_product'], (int) $this->context->customer->id, (int) $this->context->cart->id, (int) $this->context->language->id);
+        if ($productModelDatas) {
+            $params['product']['available_for_order'] &= $productModelDatas['available_for_order'];
+            $params['product'][$this->name] = $productModelDatas;
+        }
+    }
+
+    /**
+     * Return data for a product considering customer and cart
+     *
+     * @param int
+     * @param int
+     * @param int
+     * @param int
+     *
+     * @return array|false
+     */
+    private function _getCurrentProductModel($idProduct, $idCustomer, $idCart, $idLang)
+    {
+        $productModel = ProductModel::getInstanceByIdObject($idProduct, false);
+        if (!$productModel->active) {
+            return false;
         }
 
+        $available_for_order = $productModel->getIsAvailableForOrder($idCustomer, $idCart);
+        $output = [
+            'soldQuantity' => $productModel->soldQuantity,
+            'wantedQuantity' => $productModel->wantedQuantity,
+            'limitQuantity' => $productModel->limit,
+            'date_from' => $productModel->date_from,
+            'date_to' => $productModel->date_to,
+            'text_available' => $productModel->text_available[$idLang],
+            'text_notavailable' => $productModel->text_notavailable[$idLang],
+            'available_for_order' => $available_for_order,
+            'quickViewModal' => (bool) (\Tools::getValue('action') == 'quickview'),
+        ];
+
+        return $output;
     }
 
     /**
@@ -58,8 +80,18 @@ trait HookTrait
      */
     public function hookActionFrontControllerSetMedia($params)
     {
-        if (!in_array($this->context->controller->php_self, ['product'])) {
+        if (!in_array($this->context->controller->php_self, ['product', 'category', 'search', 'cart'])) {
             return;
+        }
+
+        if ($this->context->controller->php_self == 'cart') {
+            $productsLimit = [];
+            foreach ($this->context->cart->getProducts() as $product) {
+                $productModelDatas = $this->_getCurrentProductModel($product['id_product'], (int) $this->context->customer->id, (int) $this->context->cart->id, (int) $this->context->language->id);
+                $productsLimit[$product['id_product']] = $productModelDatas;
+            };
+
+            \Media::addJsDef([$this->name => $productsLimit]);
         }
 
         $this->context->controller->registerStylesheet("module-{$this->name}-front-css", "modules/{$this->name}/views/css/front.css");

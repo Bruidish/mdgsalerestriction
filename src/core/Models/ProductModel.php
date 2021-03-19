@@ -98,6 +98,39 @@ class ProductModel extends \mdg\salerestriction\Models\ObjectModel
     }
 
     /**
+     * Assings soldQuantity and wantedQuantity depending to ids submitted
+     *
+     * @param int
+     * @param int
+     *
+     * @return void
+     */
+    public function setCurrentLimits($idCustomer, $idCart)
+    {
+        $countSaleQuery = new \DbQuery();
+        $countSaleQuery->select('SUM(od.product_quantity)');
+        $countSaleQuery->from('order_detail', 'od');
+        $countSaleQuery->innerJoin('orders', 'o', 'o.id_order=od.id_order');
+        $countSaleQuery->where("o.valid=1");
+        $countSaleQuery->where("o.id_customer={$idCustomer}");
+        $countSaleQuery->where("od.product_id={$this->id_object}");
+        if ($this->date_from) {
+            $countSaleQuery->where("o.date_upd>='{$this->date_from}'");
+        }
+        if ($this->date_to) {
+            $countSaleQuery->where("o.date_upd<='{$this->date_to}'");
+        }
+        $this->soldQuantity = (int) \Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue($countSaleQuery);
+
+        $countCartQuery = new \DbQuery();
+        $countCartQuery->select('SUM(cp.quantity)');
+        $countCartQuery->from('cart_product', 'cp');
+        $countCartQuery->where("cp.id_cart={$idCart}");
+        $countCartQuery->where("cp.id_product={$this->id_object}");
+        $this->wantedQuantity = (int) \Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue($countCartQuery);
+    }
+
+    /**
      * Check if the product is available for order concidering only this module params
      *
      * @param int
@@ -108,27 +141,7 @@ class ProductModel extends \mdg\salerestriction\Models\ObjectModel
     public function getIsAvailableForOrder($idCustomer, $idCart)
     {
         if ($this->active) {
-            $countSaleQuery = new \DbQuery();
-            $countSaleQuery->select('SUM(od.product_quantity)');
-            $countSaleQuery->from('order_detail', 'od');
-            $countSaleQuery->innerJoin('orders', 'o', 'o.id_order=od.id_order');
-            $countSaleQuery->where("o.valid=1");
-            $countSaleQuery->where("o.id_customer={$idCustomer}");
-            $countSaleQuery->where("od.product_id={$this->id_object}");
-            if ($this->date_from) {
-                $countSaleQuery->where("o.date_upd>='{$this->date_from}'");
-            }
-            if ($this->date_to) {
-                $countSaleQuery->where("o.date_upd<='{$this->date_to}'");
-            }
-            $this->soldQuantity = (int) \Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue($countSaleQuery);
-
-            $countCartQuery = new \DbQuery();
-            $countCartQuery->select('SUM(cp.quantity)');
-            $countCartQuery->from('cart_product', 'cp');
-            $countCartQuery->where("cp.id_cart={$idCart}");
-            $countCartQuery->where("cp.id_product={$this->id_object}");
-            $this->wantedQuantity = (int) \Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue($countCartQuery);
+            $this->setCurrentLimits($idCustomer, $idCart);
 
             return (bool) (($this->soldQuantity + $this->wantedQuantity) < (int) $this->limit);
         }

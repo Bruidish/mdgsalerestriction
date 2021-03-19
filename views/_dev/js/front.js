@@ -6,9 +6,13 @@
  * @package prestashop 1.6 - 1.7
  */
 
-class MdgSaleRestriction {
-  constructor() {
-    this.$wrapper = $('#mdgsalerestriction-wrap');
+/**
+ * Regroups method in the Product page
+ */
+class MdgSaleRestrictionProduct {
+  constructor(wrapper) {
+    this.wrapper = wrapper;
+    this.$wrapper = $(this.wrapper);
     if (!this.$wrapper.length) {
       return false;
     }
@@ -18,13 +22,12 @@ class MdgSaleRestriction {
     this.wantedQuantity = parseInt(this.$wrapper.data('wanted_quantity'));
     this.limitQuantity = parseInt(this.$wrapper.data('limit_quantity'));
 
-    $('#quantity_wanted').attr('max', this.limitQuantity - (this.wantedQuantity + this.soldQuantity));
-
+    this.render();
     this.events();
   }
 
   events() {
-    // Update product action when cart is updated
+    // Update product action and messages when cart is updated
     prestashop.on('updateCart', (e) => {
       this.wantedQuantity = 0;
 
@@ -38,23 +41,75 @@ class MdgSaleRestriction {
     });
 
     // Limit quantity
-    $("body").on("change keyup", "#quantity_wanted", (e) => {
+    $(document).on("change keyup", "#quantity_wanted", (e) => {
       var $el = $(e.currentTarget);
       if ($el.val() > this.limitQuantity - (this.wantedQuantity + this.soldQuantity)) {
-        $el.val(this.limitQuantity - (this.wantedQuantity + this.soldQuantity));
+        $el.val(this.limitQuantity - (this.wantedQuantity + this.soldQuantity))
+        return false
       }
     });
   }
 
   render() {
-    $('#quantity_wanted').attr('max', this.limitQuantity - (this.wantedQuantity + this.soldQuantity));
-    $('.product-add-to-cart .add button').attr('disabled', this.wantedQuantity + this.soldQuantity >= this.limitQuantity);
-    $('.product-add-to-cart .availableForOrder').toggleClass('d-none', this.wantedQuantity + this.soldQuantity >= this.limitQuantity);
-    $('.product-add-to-cart .notAvailableForOrder').toggleClass('d-none', this.wantedQuantity + this.soldQuantity < this.limitQuantity);
+    var notAvailable = this.wantedQuantity + this.soldQuantity >= this.limitQuantity
+    $('#quantity_wanted').attr('disabled', notAvailable)
+    $('.product-add-to-cart .add button').attr('disabled', notAvailable)
+    $('.product-add-to-cart .availableForOrder').toggleClass('d-none', notAvailable)
+    $('.product-add-to-cart .notAvailableForOrder').toggleClass('d-none', !notAvailable)
+  }
+}
+
+
+/**
+ * Regroups method in the Shoppingcart page
+ */
+class MdgSaleRestrictionCart {
+  constructor(wrapper) {
+    this.wrapper = wrapper;
+    this.$wrapper = $(this.wrapper);
+    if (!this.$wrapper.length || typeof mdgsalerestriction == 'undefined') {
+      return false;
+    }
+
+    this.render();
+    this.events();
   }
 
+  render() {
+    $.each($('input.js-cart-line-product-quantity', this.$wrapper), function (index, el) {
+      var $el = $(el);
+      var $li = $el.closest('li');
+
+      if (mdgsalerestriction[$el.data('product-id')]) {
+        var maxWantedQuantity = (mdgsalerestriction[$el.data('product-id')].limitQuantity - mdgsalerestriction[$el.data('product-id')].soldQuantity)
+
+        $li.find('.mdgsalerestriction-message').remove();
+        $li.find('.product-line-grid-body').append(`
+            <div class="product-line-info mdgsalerestriction-message">
+              ${mdgsalerestriction[$el.data('product-id')].text_available}
+            </div>
+          `);
+
+        $el.on('touchspin.on.startupspin keyup', () => {
+          if ($el.val() > maxWantedQuantity) {
+            $el.val(maxWantedQuantity)
+            return false
+          }
+        })
+      }
+    })
+  }
+
+  events() {
+    // Update product action and messages when cart is updated
+    prestashop.on('updatedCart', (e) => {
+      this.$wrapper = $(this.wrapper);
+      this.render();
+    });
+  }
 }
 
 $(function () {
-  new MdgSaleRestriction;
+  new MdgSaleRestrictionProduct('#mdgsalerestriction-wrap');
+  new MdgSaleRestrictionCart('.cart-overview');
 })

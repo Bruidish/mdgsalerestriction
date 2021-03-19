@@ -23,5 +23,13 @@
             {$product.mdgsalerestriction.text_notavailable nofilter}
         </div>
     </div>
+
+    {if $product.mdgsalerestriction.quickViewModal}
+        <script>
+            $(function () {
+                new MdgSaleRestrictionProduct('#mdgsalerestriction-wrap');
+            })
+        </script>
+    {/if}
 {/if}
 
